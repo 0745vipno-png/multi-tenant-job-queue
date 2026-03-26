@@ -1,0 +1,37 @@
+$env:PYTHONPATH = "."; python -m pytest -s
+
+🚀 Job Queue 核心指令小抄
+
+1. 環境初始化 (首次執行)
+
+powershell
+
+# 安裝測試工具
+
+pip install pytest
+
+
+
+2. 執行全流程整合測試 (驗收開機)
+這是最重要的一行，會跑完「提交 → 領取 → 結案」的所有邏輯。
+powershell
+# 設定環境變數並執行測試 (-s 可以看到 ✅ 步驟訊息)
+$env:PYTHONPATH = "."; python -m pytest -s tests/unit/integration/test_full_lifecycle.py
+
+
+3. 清除快取 (遇到怪報錯、代碼沒同步時)
+
+powershell
+
+# 強制刪除 Python 編譯快取資料夾
+
+Remove-Item -Path "**/__pycache__" -Recurse -Force -ErrorAction SilentlyContinue
+
+
+4. 執行所有單元測試
+
+powershell
+
+# 檢查各個零件 (Service, Domain) 的獨立邏輯
+
+$env:PYTHONPATH = "."; python -m pytest tests/unit/
