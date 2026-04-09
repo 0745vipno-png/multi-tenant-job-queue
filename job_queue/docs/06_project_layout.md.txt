@@ -1,0 +1,120 @@
+job_queue/
+
+├── cmd/                         # entrypoints（CLI / future API）
+│   └── jobq/
+│       ├── main.py              # or main.go / main.ts
+│       └── cli.py               # CLI command definitions
+│
+├── internal/                    # 核心實作（不可被外部依賴）
+│
+│   ├── domain/                  # 🧠 純領域模型（最重要）
+│   │   ├── job/
+│   │   │   ├── model.py         # Job entity
+│   │   │   ├── states.py        # Job states enum
+│   │   │   ├── transitions.py   # Job transition rules
+│   │   │   └── errors.py
+│   │   │
+│   │   ├── lease/
+│   │   │   ├── model.py
+│   │   │   ├── states.py
+│   │   │   ├── transitions.py
+│   │   │   └── errors.py
+│   │   │
+│   │   ├── worker/
+│   │   │   ├── model.py
+│   │   │   ├── states.py
+│   │   │   └── errors.py
+│   │   │
+│   │   ├── attempt/
+│   │   │   ├── model.py
+│   │   │   └── states.py
+│   │   │
+│   │   ├── queue/
+│   │   │   ├── model.py
+│   │   │   └── policy.py
+│   │   │
+│   │   └── common/
+│   │       ├── types.py         # IDs, timestamps
+│   │       └── errors.py
+│
+│   ├── service/                 # ⚙️ 業務邏輯（state machine enforcement）
+│   │   ├── job_service.py
+│   │   ├── lease_service.py
+│   │   ├── execution_service.py
+│   │   ├── worker_service.py
+│   │   ├── queue_service.py
+│   │   └── policy_service.py
+│
+│   ├── repository/              # 🗄️ 資料存取 abstraction
+│   │   ├── interfaces/          # interface 定義（重要）
+│   │   │   ├── job_repository.py
+│   │   │   ├── lease_repository.py
+│   │   │   ├── worker_repository.py
+│   │   │   ├── attempt_repository.py
+│   │   │   └── queue_repository.py
+│   │   │
+│   │   └── sqlite/              # SQLite implementation（v0.1）
+│   │       ├── job_repo.py
+│   │       ├── lease_repo.py
+│   │       ├── worker_repo.py
+│   │       ├── attempt_repo.py
+│   │       ├── queue_repo.py
+│   │       └── db.py            # connection / transaction helper
+│
+│   ├── infra/                   # 🧩 基礎設施（非業務）
+│   │   ├── time/
+│   │   │   └── provider.py      # ⏱️ TimeProvider（很重要）
+│   │   │
+│   │   ├── id/
+│   │   │   └── generator.py     # ULID / UUID
+│   │   │
+│   │   ├── logging/
+│   │   │   └── logger.py
+│   │   │
+│   │   ├── config/
+│   │   │   └── settings.py
+│   │   │
+│   │   └── concurrency/
+│   │       └── backoff.py       # retry / jitter
+│
+│   ├── application/             # 🧠 use-case orchestration（可選，但推薦）
+│   │   ├── submit_job.py
+│   │   ├── lease_job.py
+│   │   ├── ack_job.py
+│   │   ├── fail_job.py
+│   │   ├── recover_leases.py
+│   │   └── heartbeat_worker.py
+│
+│   └── context/                 # 🔒 tenant context
+│       └── tenant_context.py
+│
+├── migrations/                  # DB schema
+│   ├── 001_init.sql
+│   ├── 002_indexes.sql
+│   └── 003_constraints.sql
+│
+├── scripts/                     # 開發工具
+│   ├── init_db.sh
+│   └── run_worker.py
+│
+├── tests/
+│   ├── unit/
+│   │   ├── domain/
+│   │   ├── service/
+│   │   └── repository/
+│   │
+│   └── integration/
+│       ├── lease_flow_test.py
+│       ├── retry_flow_test.py
+│       └── recovery_test.py
+│
+├── docs/
+│   ├── 01_high_level_architecture.md
+│   ├── 02_job_lifecycle.md
+│   ├── 03_lease.md
+│   ├── 04_data_model.md
+│   ├── 05_state_machine.md
+│   └── 06_repository_architecture.md   
+├── pyproject.toml / package.json / go.mod
+├── README.md
+└── Makefile
