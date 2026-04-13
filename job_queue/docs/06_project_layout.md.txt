@@ -1,3 +1,11 @@
+這個系統怎麼保證不會出錯？
+
+他具備以下特徵:唯一性（One Lease per Job)
+
+	       權限性（Owner Only)
+
+	       時效性（Auto-expiry)
+
 job_queue/
 
 ├── cmd/                         # entrypoints（CLI / future API）
