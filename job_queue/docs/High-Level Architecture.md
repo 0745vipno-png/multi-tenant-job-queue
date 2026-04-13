@@ -163,3 +163,9 @@ Design Principles
 4. Deterministic retry handling
 5. Worker-visible, operator-readable state
 6. API-first evolution path
+
+Job Lifecycle States:
+PENDING -> [Lease] -> RUNNING
+RUNNING -> [Success] -> COMPLETED
+RUNNING -> [Failure/Timeout] -> RETRY_PENDING -> PENDING
+RUNNING -> [Max Retries Exceeded] -> DEAD_LETTER
