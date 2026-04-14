@@ -2,7 +2,7 @@
 setlocal
 :: 1. 設定編碼為 UTF-8
 chcp 65001 >nul
-
+echo 執行速度根據SSD讀寫時間決定
 echo.
 echo 🚀 Starting SaaS Job Queue Engine...
 echo ---------------------------------------
