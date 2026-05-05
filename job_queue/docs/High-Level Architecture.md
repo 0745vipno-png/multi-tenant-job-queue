@@ -163,6 +163,7 @@ Design Principles
 4. Deterministic retry handling
 5. Worker-visible, operator-readable state
 6. API-first evolution path
+7. "Operations are Liabilities" — Minimize external state and maximize self-healing.
 
 Job Lifecycle States:
 PENDING -> [Lease] -> RUNNING
