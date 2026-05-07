@@ -4,6 +4,13 @@
 #為什麼要用 SQLite 跑測試？
 #這符合我追求的 Zero-config 交付。我確保開發者不需要安裝 Redis 或 RabbitMQ，只要有 Python 環境，就能 100% 驗證整個系統的生命週期。
 
+#「既然是多租戶（Multi-tenant），如果 Tenant A 塞爆了 Queue，會影響 Tenant B 嗎？」
+#在目前的 JobRepo 層級，我透過 tenant_id 物理隔離了查詢。未來如果要防止資源擠兌（Noisy Neighbor），我可以在 LeaseService裡加入 Tenant Quota（租戶配額） 的策略控制。」
+
+#「SQLite 在高併發（Concurrency）下會有 Locking 問題，這怎麼解決？」
+
+#「SQLite 的確不適合極高頻寫入，但在我的設計中，資料庫層級被封裝在 Repository 之後。如果未來規模擴大，我只需要抽換PostgreSQLRepository 即可，核心業務邏輯不需要改動。
+
 from __future__ import annotations
 import pytest
 from datetime import datetime, timezone
