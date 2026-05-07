@@ -1,3 +1,9 @@
+#為什麼要寫 time_provider 而不直接用 datetime.now()？
+#為了確保測試的確定性。透過 Mock TimeProvider，我可以模擬任務超時（Lease Timeout）的邊界情況，而不需要真的在測試中 sleep 30 秒。
+
+#為什麼要用 SQLite 跑測試？
+#這符合我追求的 Zero-config 交付。我確保開發者不需要安裝 Redis 或 RabbitMQ，只要有 Python 環境，就能 100% 驗證整個系統的生命週期。
+
 from __future__ import annotations
 import pytest
 from datetime import datetime, timezone
