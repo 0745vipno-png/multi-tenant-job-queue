@@ -1,3 +1,25 @@
+「Lease-based（租約制）」：解決 Worker 消失、任務卡死的問題。
+「Idempotent（冪等性）」：確保任務重複跑也不會出事。
+「若 Lease 過期且次數未達上限，系統必須在不經人工干預下，自動回退狀態並觸發重試。」
+
+問:為什麼不選「現成的」Redis/Celery？
+答 :「現成的工具在極端網路 Partition 或節點崩潰時，容易產生不可預測的狀態。我追求的是 Deterministic（確定性）。透過 Lease-based 租約機制，我能確保任務在任何情況下都『生有處、死有蹤』，這對企業級 AI 簽核來說是安全底線。」
+
+問：「為什麼不用 Redis / RabbitMQ？」
+答：「比起導入複雜的基礎設施，我優先選擇『部署確定性』。在當前規模下，SQLite 讓系統達成 Zero-config，且能 100% 驗證邏輯正確性。」
+
+問：「你不怕分散式鎖的問題嗎？」
+答：「分散式鎖增加複雜度。我目前採用 Lease-based 模型搭配狀態機，先從架構層級確保『任務執行權』的唯一性，這比依賴外部鎖更直觀。」
+
+問：「為什麼要特地寫狀態機？if-else 不行嗎？
+答：「if-else 會產生隱藏狀態。顯式狀態機（Explicit state machine）是為了消除不可能的執行路徑，將 Bug 擋在設計階段。」
+
+問：「Lease-based 的超時設定怎麼拿捏？
+答：「這是正確性與恢復速度的權衡。我透過 TimeProvider 讓這個參數可測試，未來能根據不同租戶的作業類型進行動態調優。」
+
+問:Worker 過期前一秒當機會怎樣？
+答:「當 Worker 崩潰導致 Lease 過期，LeaseService 會在下一個循環發現該任務已超時且未 Ack。系統會自動重置任務狀態回 Pending，並根據 PolicyService 的 Jitter 重試機制重新派發。因為我的設計是 Idempotent（冪等） 的，所以不用擔心重複執行的風險。」
+
 # Multi-Tenant Job Queue / Task Runner
 
 A production-style, infrastructure-oriented job queue system designed with **deterministic state machines**, **lease-based execution control**, and **multi-tenant isolation**.
