@@ -2,6 +2,15 @@
 「Idempotent（冪等性）」：確保任務重複跑也不會出事。
 「若 Lease 過期且次數未達上限，系統必須在不經人工干預下，自動回退狀態並觸發重試。」
 
+額外QA補充:
+
+問 : AI 推理動輒 30 秒，HTTP 連線斷線怎麼辦？
+答（Lease-based）：
+ 「AI 任務是昂貴且長耗時的資源。我的系統捨棄了脆弱的 HTTP 同步等待，改用 Lease-based（租約制）非同步引擎。一旦 Worker 在推理過程中斷線，租約過期自動回收並重啟任務，確保高價的 GPU 算力不被幽靈任務榨乾。」
+
+問:高併發下，使用者瘋狂點擊，導致同一個 AI 請求被重複執行（算力加倍浪費）？
+答:Idempotent + State Machine）： 「我引入了顯式狀態機（Explicit State Machine）與樂觀鎖（Optimistic Locking），嚴格限制狀態轉移路徑。配合冪等性（Idempotent）設計，即使高併發下發生 Race Condition，系統也從架構層級確保執行權的唯一性，絕對不重複浪費 AI 資源。」
+
 問:為什麼不選「現成的」Redis/Celery？
 答 :「現成的工具在極端網路 Partition 或節點崩潰時，容易產生不可預測的狀態。我追求的是 Deterministic（確定性）。透過 Lease-based 租約機制，我能確保任務在任何情況下都『生有處、死有蹤』，這對企業級 AI 簽核來說是安全底線。」
 
