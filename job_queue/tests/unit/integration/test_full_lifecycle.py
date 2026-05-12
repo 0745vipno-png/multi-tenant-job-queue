@@ -1,3 +1,5 @@
+#免責聲明:此代碼為MVP版本 僅供參考
+
 #為什麼要寫 time_provider 而不直接用 datetime.now()？
 #為了確保測試的確定性。透過 Mock TimeProvider，我可以模擬任務超時（Lease Timeout）的邊界情況，而不需要真的在測試中 sleep 30 秒。
 
