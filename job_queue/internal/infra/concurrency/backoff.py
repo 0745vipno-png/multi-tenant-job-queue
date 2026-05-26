@@ -57,7 +57,8 @@ class Backoff:
         return delay
 
     def sleep(self, attempt: int):
-        """執行緒休眠"""
+        """執行緒休眠"""    # Q: 為什麼這段 compute_delay 傳入 attempt 卻是用 attempt - 1 當次方？
+                           # A: 這能確保第一次失敗後的重試延遲是從 base_delay 本身開始（2的0次方=1），而不是第一步就直接跳到 base_delay * factor。這能給系統更細膩、成本更低的恢復機會。 而不是從 base_delay * factor 開始（2的1次方=2）。這樣設計更符合指數退避的預期行為
         delay = self.compute_delay(attempt)
         time.sleep(delay)
 
