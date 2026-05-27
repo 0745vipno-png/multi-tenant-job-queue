@@ -74,6 +74,7 @@ job_queue/
 │   ├── infra/                   # 🧩 基礎設施（非業務）
 │   │   ├── time/
 │   │   │   └── provider.py      # ⏱️ TimeProvider（很重要）
+								 #分散式系統中，時間是不可信的。我設計了 TimeProvider，在生產環境它提供精準的系統時間；但在 tests/ 的單元測試或壓力測試中，我可以輕易 Mock 這個 Provider，自由快進或凍結時間，來驗證 Lease 的 Auto-expiry（自動過期） 與自癒邏輯是否百分之百精準。
 │   │   │
 │   │   ├── id/
 │   │   │   └── generator.py     # ULID / UUID
