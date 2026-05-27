@@ -1,10 +1,10 @@
 這個系統怎麼保證不會出錯？
 
-他具備以下特徵:唯一性（One Lease per Job)
+他具備以下特徵:唯一性（One Lease per Job) : 解決了「重複執行」造成的資料污染。
 
-	       權限性（Owner Only)
+	       	  權限性（Owner Only) : 解決了「殭屍節點」亂改數據的問題。
 
-	       時效性（Auto-expiry)
+	          時效性（Auto-expiry) : 解決了「死結（Deadlock）」與節點崩潰後的自癒問題。
 
 #該模組支援可拔插功能SQLite無痛更換其他DB , 其餘核心邏輯不需更動
 
