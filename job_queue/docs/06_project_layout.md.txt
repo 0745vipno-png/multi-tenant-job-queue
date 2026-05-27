@@ -6,6 +6,8 @@
 
 	       時效性（Auto-expiry)
 
+#該模組支援可拔插功能SQLite無痛更換其他DB , 其餘核心邏輯不需更動
+
 job_queue/
 
 ├── cmd/                         # entrypoints（CLI / future API）
@@ -46,8 +48,8 @@ job_queue/
 │   │       └── errors.py
 │
 │   ├── service/                 # ⚙️ 業務邏輯（state machine enforcement）
-│   │   ├── job_service.py
-│   │   ├── lease_service.py
+│   │   ├── job_service.py      
+│   │   ├── lease_service.py     
 │   │   ├── execution_service.py
 │   │   ├── worker_service.py
 │   │   ├── queue_service.py
