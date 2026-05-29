@@ -1,8 +1,10 @@
+System Design分散式系統常見問答整理
+實作這個多租戶 Job Queue 時，遇過最難的挑戰是什麼？
+答：「最難的不是寫出功能，而是對抗系統的不確定性。我當時花了很多時間在做防禦性設計。例如我一直在思考：萬一 Worker 沒死，只是因為長耗時 I/O 卡住，在 Lease 過期後突然活過來發起 Ack，要怎麼防止它變成『殭屍』破壞一致性？後來我決定在 ExecutionService 實作雙重校驗，配合狀態機與樂觀鎖的 Token 匹配，直接拒絕非法 Ack，強制殭屍自毀。這比盲目去引入沉重的 Redis 鎖更直觀、更具備確定性
+
 「Lease-based（租約制）」：解決 Worker 消失、任務卡死的問題。
 「Idempotent（冪等性）」：確保任務重複跑也不會出事。
 「若 Lease 過期且次數未達上限，系統必須在不經人工干預下，自動回退狀態並觸發重試。」
-
-額外QA補充:
 
 問 : AI 推理動輒 30 秒，HTTP 連線斷線怎麼辦？
 答（Lease-based）：
@@ -28,6 +30,15 @@
 
 問:Worker 過期前一秒當機會怎樣？
 答:「當 Worker 崩潰導致 Lease 過期，LeaseService 會在下一個循環發現該任務已超時且未 Ack。系統會自動重置任務狀態回 Pending，並根據 PolicyService 的 Jitter 重試機制重新派發。因為我的設計是 Idempotent（冪等） 的，所以不用擔心重複執行的風險。」
+
+額外補充問答 
+問:SQLite 的併發寫入限制（Write Lock）很明顯，如果未來公司有數萬個任務同時進來，你怎麼辦？」
+答:目前選擇 SQLite 是基於 單機確定性 與 零配置部署。當規模擴大到單機 I/O 瓶頸時，因為我的架構採用了 Repository Layer (倉儲層) 與 Domain Layer 解耦，我可以無痛將 Repository 實作替換為 PostgreSQL 或 MySQL，而核心的 Lease 邏輯與狀態機完全不需要改動。這正是 Clean Architecture 的價值。」
+
+問:如果 Worker 的 Lease 過期了，但它其實『沒死』只是卡住了（例如 GC 或長耗時 I/O），後來它突然活過來並嘗試 Ack，你的系統怎麼處理這個『殭屍』？」
+答:在 Ack 階段，ExecutionService 會進行第二次校驗。如果資料庫中的 Lease 已經被 LeaseService 宣告過期並重置為 Pending，則該次 Ack 會因為 Version/Token 不匹配 而被拒絕（樂觀鎖）。Worker 會收到一個失敗回傳，自行終止任務，確保數據一致性。」
+ 殭屍 Worker 額外說明: 這是關於雙重寫入/分散式腦裂的問題
+ 答： ExecutionService 在 Ack 階段會透過樂觀鎖（Version/Token）進行第二次校驗，直接拒絕過期的 Ack，讓殭屍自行終止。
 
 # Multi-Tenant Job Queue / Task Runner
 
