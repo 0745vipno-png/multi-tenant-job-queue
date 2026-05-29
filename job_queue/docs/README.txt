@@ -57,6 +57,12 @@
 儲存端版本化（Versioning）：S3 的檔案命名不能用固定的 report.json，必須強制帶上 job_id_version_token.json。這樣 Worker 1 與 Worker 2 寫入的是不同的物件，不發生覆蓋。
 條件式寫入（Conditional Upload）：在寫入儲存體或進行下一個破壞性操作前，Worker 必須實作『內部檢查點（Checkpoint）』。它必須先向 ExecutionService 發起一個輕量級的 is_lease_valid() 預檢。雖然這無法 100% 消除時序上的 Race Condition（TOCTOU 漏洞），但搭配物件版本化，就能徹底確保最終數據的正確性。」
 
+問:「用 job_id_version_token 分開寫入 S3 成功解決了覆蓋問題。但最後到底是誰來決定哪一個檔案才是『最終真理』？是不是在樂觀鎖 Ack 成功的那個 Worker，才有權力去更新一個 latest_report_pointer 的資料庫欄位？」
+答:沒錯！只有 Ack 成功的 Worker，它的 Version Token 才會寫入 DB 主表，這時 DB 內的欄位就是唯一真理的 Pointer。)
+
+問:「在高併發下，每次 Polling 都用 Window Function 做 30% 的 Tenant 篩選，SQLite 的 CPU 可能會吃滿。未來如果要轉向 PostgreSQL，你會怎麼優化這個公平調度佇列？」
+答:：未來可以引入 Redis 的 ZSET（有序集合）為每個 Tenant 做權重滑動視窗，或者在應用層（Application Layer）實作變形的使用者權杖桶（Token Bucket），把這層計算從關聯式 DB 剝離。
+
 --------------底下為架構圖的設計-------------------------------
 
 # Multi-Tenant Job Queue / Task Runner
