@@ -1,3 +1,15 @@
+### 🧠 Advanced Architectural Decisions: Brain-Split & Fencing Mitigation
+
+In a distributed environment, transient network partitions or prolonged worker garbage collection (GC) pauses can lead to the notorious **"Zombie Worker" (Straggler) problem**, causing **Brain-Split scenarios** where multiple workers attempt to mutate state simultaneously.
+
+This system guarantees strict data consistency against brain-split through an industrial-grade **Token/Epoch Fencing Mechanism**:
+
+1. **Server-Side Truth**: Real-time state and lease tracking are strictly confined to the centralized database (`NOW()` evaluation and version anchoring). 
+2. **Generational Tokens**: When a tenant lease expires, the system increments the `version_token` (Epoch). The old token held by the zombie worker is instantly revoked system-wide.
+3. **Side-Effect Fencing**: To prevent un-fenced zombie workers from polluting external downstream storage (e.g., AWS S3) prior to database acknowledgment, all artifact paths are deterministically isolated using the snapshot pattern: `job_id_version_token.json`. 
+4. **Optimistic Guard**: Any stale acknowledgement or out-of-order write attempts from a partitioned worker will trigger an optimistic locking failure, forcing the zombie worker to gracefully self-terminate.
+
+
 # 深入探討：極端場景下的防禦性設計 (Deep Dive: Defensive Design for Edge Cases)
 實作這個多租戶 Job Queue 時，遇過最難的挑戰是什麼？
 答：「最難的不是寫出功能，而是對抗系統的不確定性。我當時花了很多時間在做防禦性設計。例如我一直在思考：萬一 Worker 沒死，只是因為長耗時 I/O 卡住，在 Lease 過期後突然活過來發起 Ack，要怎麼防止它變成『殭屍』破壞一致性？後來我決定在 ExecutionService 實作雙重校驗，配合狀態機與樂觀鎖的 Token 匹配，直接拒絕非法 Ack，強制殭屍自毀。這比盲目去引入沉重的 Redis 鎖更直觀、更具備確定性
