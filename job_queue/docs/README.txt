@@ -39,6 +39,25 @@ System Design分散式系統常見問答整理
 答:在 Ack 階段，ExecutionService 會進行第二次校驗。如果資料庫中的 Lease 已經被 LeaseService 宣告過期並重置為 Pending，則該次 Ack 會因為 Version/Token 不匹配 而被拒絕（樂觀鎖）。Worker 會收到一個失敗回傳，自行終止任務，確保數據一致性。」
  殭屍 Worker 額外說明: 這是關於雙重寫入/分散式腦裂的問題
  答： ExecutionService 在 Ack 階段會透過樂觀鎖（Version/Token）進行第二次校驗，直接拒絕過期的 Ack，讓殭屍自行終止。
+--------------------------------------------------------------------------------------------------------------------------
+
+進階難度問答題:
+
+問:多租戶（Multi-tenant），假設 A 租戶是個大戶，一秒鐘塞了 10 萬個高優先級（High Priority）的 AI 簽核任務進來；而 B 租戶是小客戶，只發了一個任務。在 Priority + Lease 機制下，B 租戶的任務會被完全餓死（Starvation）。要怎麼修改你的任務獲取（Polling/Lease）邏輯，在不幫每個租戶開獨立資料庫與獨立獨立機器的前提下，兼顧『高優先級優先』與『租戶間的資源公平性（Fairness）』？」
+
+答:「這確實是多租戶最頭痛的『雜訊鄰居』問題。單純依賴全域的 priority 欄位一定會導致小客戶被餓死。為了在單一 SQLite/PostgreSQL 中解決，我會引入 Fair-Share 派發演算法 或 租約配額制（Quota）。具體做法是，在 LeaseService 撈取任務時，SQL 不能只下 ORDER BY priority DESC。我會調整為 帶有租戶配額的權重隨機（Weighted Random） 或 按租戶分組的 Window Function。例如：限制每次 Batch 取出 100 個任務時，單一 TenantID 的佔比不能超過 30%。如果超過，剩餘的份額強制留給其他 Tenant 的任務。這樣既能保證大戶的緊急任務被快速處理，也能確保小客戶得到基本的服務承諾（SLA）。」
+
+問:你前面提到了 Lease-based 租約機制，還說你用了 TimeProvider 來做測試。但現實中，你的 Job Queue 服務可能部署在伺服器 A，而那群 Worker 部署在不同的伺服器 B、C、D 上。各台機器的硬體時鐘一定存在微小的時鐘偏移（Clock Skew），甚至 NTP 同步時會出現『時間跳變（Time Jump）』。如果 Worker B 的系統時間比伺服器 A 快了整整 5 秒，你的 Lease 超時判定與樂觀鎖 Token 檢查，會不會因為這個時間差直接崩潰？你怎麼在軟體層面做到對時鐘的不依賴？」
+
+答:這就是為什麼我的 Lease 機制絕對不依賴 Worker 端的系統時間，時間的絕對真理只能存在於中央資料庫（Server-side）。當 Worker 來領取任務時，資料庫會用 NOW() + 30s 計算過期時間，但回傳給 Worker 的不是一個絕對的時間戳（Timestamp），而是一個相對的租約長度（TTL，例如 30 秒）。Worker 內部自己倒數 30 秒。如果快到期了，Worker 必須主動發起『續租（Renew Lease）』請求。而在最終的 Ack 階段，我的樂觀鎖校驗只比對資料庫內的 version_token，完全不看 Worker 帶過來的時間。透過『中央決定絕對時間，客戶端只用相對時間』的設計，時鐘偏移對我的系統一致性零影響。」
+
+問:回到你引以為傲的『殭屍 Worker 雙重校驗』。假設 Worker 處理的是一個長耗時 AI 任務，它在執行第 29 秒時，Lease 剛好過期。此時，中央資料庫認定它死了，把任務重置並派給了 Worker 2。就在這一瞬間，原本卡住的 Worker 1 突然醒了，它剛好執行到最後一步：把 AI 算好的巨量結果資料（例如 50MB 的分析報告）寫入另一個獨立的儲存服務（如 AWS S3），然後才回頭來找你的資料庫 Ack。這時候你的資料庫樂觀鎖確實會拒絕它的 Ack，但那份 50MB 的產出已經被錯誤地寫進 S3、覆蓋掉正確的資料了。這種在 Ack 之前的外部寫入副作用，你要怎麼攔截？」
+
+答:「這涉及到了分散式系統中的 Fencing（柵欄機制）。當我們無法阻止殭屍 Worker 向外部第三方服務（如 S3）發起寫入時，我們必須讓第三方服務也具備識別『過期憑證』的能力。我的解決方案有兩個層級：
+儲存端版本化（Versioning）：S3 的檔案命名不能用固定的 report.json，必須強制帶上 job_id_version_token.json。這樣 Worker 1 與 Worker 2 寫入的是不同的物件，不發生覆蓋。
+條件式寫入（Conditional Upload）：在寫入儲存體或進行下一個破壞性操作前，Worker 必須實作『內部檢查點（Checkpoint）』。它必須先向 ExecutionService 發起一個輕量級的 is_lease_valid() 預檢。雖然這無法 100% 消除時序上的 Race Condition（TOCTOU 漏洞），但搭配物件版本化，就能徹底確保最終數據的正確性。」
+
+--------------底下為架構圖的設計-------------------------------
 
 # Multi-Tenant Job Queue / Task Runner
 
