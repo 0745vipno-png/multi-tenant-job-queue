@@ -26,6 +26,10 @@ I am fully aware that if this implementation were posted on Hacker News, the dis
    - *My Defense:* True. Physical clocks are a lie in distributed environments. The absolute truth of time in this system is strictly delegated to the central DB engine using relative TTLs. For strict zero-dependency ordering, future iterations would adopt Logical Clocks (Lamport Timestamps).
 
 # 深入探討：極端場景下的防禦性設計 (Deep Dive: Defensive Design for Edge Cases)
+
+問:什麼是驚群效應？
+答:當多個處理程序（Processes）、執行緒（Threads）或分散式節點，同時在等待同一個事件或資源。當這個事件突然發生時，系統會同時喚醒所有的等待者，但最終只有一個幸運兒能搶到資源，其他被喚醒的節點只能白忙一場，接著再度進入睡眠。
+
 實作這個多租戶 Job Queue 時，遇過最難的挑戰是什麼？
 答：「最難的不是寫出功能，而是對抗系統的不確定性。我當時花了很多時間在做防禦性設計。例如我一直在思考：萬一 Worker 沒死，只是因為長耗時 I/O 卡住，在 Lease 過期後突然活過來發起 Ack，要怎麼防止它變成『殭屍』破壞一致性？後來我決定在 ExecutionService 實作雙重校驗，配合狀態機與樂觀鎖的 Token 匹配，直接拒絕非法 Ack，強制殭屍自毀。這比盲目去引入沉重的 Redis 鎖更直觀、更具備確定性
 
