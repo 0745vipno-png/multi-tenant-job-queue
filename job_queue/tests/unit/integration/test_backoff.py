@@ -1,3 +1,7 @@
+#高維度分散式演算法校驗與統計測試實踐 (Algorithmic & Statistical Testing)：
+#遵循高標準軟體品質控制，針對高併發退避演算法實作嚴密的單體測試。除透過控制變因（關閉 Jitter）校驗指數增長與封頂邊界（Cap）之確定性測試外；更針對 Full
+#Jitter 之非確定性隨機分佈，設計採樣去重（Entropy Check）與區間斷言，透過統計學思維完美校驗隨機函數之熵值與安全性，確保核心高併發防禦邏輯 100% 穩定。
+
 import pytest
 from internal.infra.concurrency.backoff import Backoff
 
