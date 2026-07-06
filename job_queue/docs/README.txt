@@ -9,21 +9,8 @@ This system guarantees strict data consistency against brain-split through an in
 3. **Side-Effect Fencing**: To prevent un-fenced zombie workers from polluting external downstream storage (e.g., AWS S3) prior to database acknowledgment, all artifact paths are deterministically isolated using the snapshot pattern: `job_id_version_token.json`. 
 4. **Optimistic Guard**: Any stale acknowledgement or out-of-order write attempts from a partitioned worker will trigger an optimistic locking failure, forcing the zombie worker to gracefully self-terminate.
 
-### 🌋 The "Hacker News" Reality Check (Known Production Limitations)
-
-I am fully aware that if this implementation were posted on Hacker News, the distributed systems deities would rip it to shreds. Let's be honest about the architectural trade-offs of this MVP:
-
-1. **Synchronous Blocking I/O (`time.sleep`):** 
-   - *The HN Critic:* "Using blocking sleep in a high-concurrency runner will starve your threads!"
-   - *My Defense:* This is a design-first MVP optimized for deterministic execution in a structured thread pool. For hyper-scale production, this entire backoff module would be re-engineered into an asynchronous event loop (`asyncio.sleep`) to free the controller thread.
-
-2. **The Pseudorandom Seed Trap (`random.uniform`):**
-   - *The HN Critic:* "Mersenne Twister is not thread-safe and fails under process forks!"
-   - *My Defense:* Correct. If workers are spawned via `fork()`, unseeded pseudorandom tracking will cause identical jitter tracks, re-triggering the thundering herd. In enterprise production, this will be strictly replaced with cryptographically secure random primitives (`secrets` module) or OS-level entropy (`/dev/urandom`).
-
-3. **Physical Time Dependency in Policies:**
-   - *The HN Critic:* "You are adding a float delay to physical `now` timestamps! Clock skew will kill your sequence!"
-   - *My Defense:* True. Physical clocks are a lie in distributed environments. The absolute truth of time in this system is strictly delegated to the central DB engine using relative TTLs. For strict zero-dependency ordering, future iterations would adopt Logical Clocks (Lamport Timestamps).
+雙11活動元件拆解:[ 1. 閘門/限流元件 ] ➡️ [ 2. 緩衝/排隊元件 ] ➡️ [ 3. 核心狀態/派工引擎 ] ➡️ [ 4. 外部副作用/儲存層 ]
+  (API Gateway / 限流)    (Queue / 租戶公平性)    (Lease + 狀態機 + 樂觀鎖)    (S3 / DB 版本化隔離)
 
 # 深入探討：極端場景下的防禦性設計 (Deep Dive: Defensive Design for Edge Cases)
 
