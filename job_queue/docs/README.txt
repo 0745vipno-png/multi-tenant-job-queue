@@ -12,8 +12,6 @@ This system guarantees strict data consistency against brain-split through an in
 雙11活動元件拆解:[ 1. 閘門/限流元件 ] ➡️ [ 2. 緩衝/排隊元件 ] ➡️ [ 3. 核心狀態/派工引擎 ] ➡️ [ 4. 外部副作用/儲存層 ]
   (API Gateway / 限流)    (Queue / 租戶公平性)    (Lease + 狀態機 + 樂觀鎖)    (S3 / DB 版本化隔離)
 
-# 深入探討：極端場景下的防禦性設計 (Deep Dive: Defensive Design for Edge Cases)
-
 問:什麼是驚群效應？
 答:當多個處理程序（Processes）、執行緒（Threads）或分散式節點，同時在等待同一個事件或資源。當這個事件突然發生時，系統會同時喚醒所有的等待者，但最終只有一個幸運兒能搶到資源，其他被喚醒的節點只能白忙一場，接著再度進入睡眠。
 要處理驚群效應實作應該使用什麼技術 :指數退避+隨機抖動
