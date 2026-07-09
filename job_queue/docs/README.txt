@@ -59,7 +59,12 @@ This system guarantees strict data consistency against brain-split through an in
 
 （SQLite 樂觀鎖實作細節）：「在 SQLite 裡，我是在任務表（Jobs Table）設計了 version_token (UUID) 與 status 欄位。
 當 ExecutionService 進行 Ack 或者是 LeaseService 判定超時要重置時，我的 SQL 語法絕對不是盲目用 UPDATE。
-我會使用帶有條件的更新：UPDATE jobs SET status = 'SUCCESS', version_token = :new_token WHERE id = :job_id AND version_token = :expected_token AND status = 'RUNNING';執行後，我會去檢查資料庫回傳的 rowcount (受影響列數)。如果 rowcount == 1，代表鎖定與驗證成功，任務安全交付。
+
+我會使用帶有條件的更新：UPDATE jobs
+                      SET status = 'SUCCESS', version_token = :new_token
+                      WHERE id = :job_id AND version_token = :expected_token AND status = 'RUNNING';
+
+執行後，我會去檢查資料庫回傳的 rowcount (受影響列數)。如果 rowcount == 1，代表鎖定與驗證成功，任務安全交付。
 如果 rowcount == 0，代表在我發起 Update 的前一秒，這個任務的狀態或 Token 已經被 LeaseService 判定超時並改寫了。這時系統會直接判定該次 Ack 失效，強制目前的 Worker 拋出異常並自我終止。透過這種 Atomic（原子性）的 SQL 條件更新，即使在 SQLite 下，我也100% 確保樂觀鎖的確定性。」
 
 --------------------------------------------------------------------------------------------------------------------------
