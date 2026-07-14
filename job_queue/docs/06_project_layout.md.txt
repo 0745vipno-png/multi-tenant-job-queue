@@ -8,6 +8,17 @@
 
 #該模組支援可拔插功能SQLite無痛更換其他DB , 其餘核心邏輯不需更動
 
+目前 v0.1 版我是用 repository/sqlite/ 快速交付、做到單機零配置（Zero-config）與 100% 驗證。未來公司如果流量衝高，我們只需要在 repository/ 底下新增一個 postgres/ 資料夾，
+
+完全照著 interfaces/ 的規格施工，把 SQL 語法改掉。核心的 domain/ 和 service/ 業務邏輯一條代碼都不用動。 這就是真正的可拔插（Pluggable）！」
+
+TimeProvider:「分散式系統中，各台機器的硬體時鐘和 NTP 是不可信的。所以設計了 TimeProvider。」
+
+「在生產環境中它去抓 Server-side 的時間；但在我旁邊的 tests/integration/（例如 lease_flow_test.py、recovery_test.py）裡面，我可以輕易 Mock 這個 Provider，在單元測試裡自由快進 30 秒或凍結時間。 這樣就能在幾
+
+毫秒內，100% 驗證 Lease 的 Auto-expiry（自動過期）與自癒邏輯是否精準，完全不用在測試時傻傻等待 30 秒！」
+
+
 job_queue/
 
 ├── cmd/                         # entrypoints（CLI / future API）
