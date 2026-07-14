@@ -1,10 +1,10 @@
 這個系統怎麼保證不會出錯？
 
-他具備以下特徵:唯一性（One Lease per Job) : 解決了「重複執行」造成的資料污染。
+他具備以下特徵:唯一性（One Lease per Job) : 解決了「重複執行」造成的資料污染。 對應 lease_service.py 與 lease_job.py：確保全域一個任務只能派發一個有效的 Token，從源頭抹除「重複執行」。
 
-	       	  權限性（Owner Only) : 解決了「殭屍節點」亂改數據的問題。
+	       	  權限性（Owner Only) : 解決了「殭屍節點」亂改數據的問題。 對應 execution_service.py 與 ack_job.py：配合樂觀鎖，只有領到該租約的 Worker 才能 Ack，殭屍節點一來直接觸發 Version 不匹配強迫自毀。
 
-	          時效性（Auto-expiry) : 解決了「死結（Deadlock）」與節點崩潰後的自癒問題。
+	          時效性（Auto-expiry) : 解決了「死結（Deadlock）」與節點崩潰後的自癒問題。  對應 recover_leases.py：死結（Deadlock）或節點崩潰？沒關係，中央調度引擎定時掃描，時間到了自動回收重置。
 
 #該模組支援可拔插功能SQLite無痛更換其他DB , 其餘核心邏輯不需更動
 
