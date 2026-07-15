@@ -74,7 +74,7 @@ This system guarantees strict data consistency against brain-split through an in
 
 進階難度問答題:
 
-問:多租戶（Multi-tenant），假設 A 租戶是個大戶，一秒鐘塞了 10 萬個高優先級（High Priority）的 AI 簽核任務進來；而 B 租戶是小客戶，只發了一個任務。在 Priority + Lease 機制下，B 租戶的任務會被完全餓死（Starvation）。要怎麼修改你的任務獲取（Polling/Lease）邏輯，在不幫每個租戶開獨立資料庫與獨立獨立機器的前提下，兼顧『高優先級優先』與『租戶間的資源公平性（Fairness）』？」
+問:多租戶（Multi-tenant），假設 A 租戶是個大戶，一秒鐘塞了 10 萬個高優先級（High Priority）的 AI 簽核任務進來；而 B 租戶是小客戶，只發了一個任務。在 Priority + Lease 機制下，B 租戶的任務會被完全餓死（Starvation）。要怎麼修改你的任務獲取（Polling/Lease）邏輯，在不幫每個租戶開獨立資料庫與獨立獨立機器的前提下，兼顧『高優先級優先』與『租戶間的資源公平性（Fairness）』？」 (不要回答加開機器這種土豪作法)
 
 答:「這確實是多租戶最頭痛的『雜訊鄰居』問題。單純依賴全域的 priority 欄位一定會導致小客戶被餓死。為了在單一 SQLite/PostgreSQL 中解決，我會引入 Fair-Share 派發演算法 或 租約配額制（Quota）。具體做法是，在 LeaseService 撈取任務時，SQL 不能只下 ORDER BY priority DESC。我會調整為 帶有租戶配額的權重隨機（Weighted Random） 或 按租戶分組的 Window Function。例如：限制每次 Batch 取出 100 個任務時，單一 TenantID 的佔比不能超過 30%。如果超過，剩餘的份額強制留給其他 Tenant 的任務。這樣既能保證大戶的緊急任務被快速處理，也能確保小客戶得到基本的服務承諾（SLA）。」
 
