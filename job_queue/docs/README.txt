@@ -8,9 +8,20 @@ This system guarantees strict data consistency against brain-split through an in
 2. **Generational Tokens**: When a tenant lease expires, the system increments the `version_token` (Epoch). The old token held by the zombie worker is instantly revoked system-wide.
 3. **Side-Effect Fencing**: To prevent un-fenced zombie workers from polluting external downstream storage (e.g., AWS S3) prior to database acknowledgment, all artifact paths are deterministically isolated using the snapshot pattern: `job_id_version_token.json`. 
 4. **Optimistic Guard**: Any stale acknowledgement or out-of-order write attempts from a partitioned worker will trigger an optimistic locking failure, forcing the zombie worker to gracefully self-terminate.
+--------------------------------------------------------------------------------------------------------------------------
 
 雙11活動元件拆解:[ 1. 閘門/限流元件 ] ➡️ [ 2. 緩衝/排隊元件 ] ➡️ [ 3. 核心狀態/派工引擎 ] ➡️ [ 4. 外部副作用/儲存層 ]
   (API Gateway / 限流)    (Queue / 租戶公平性)    (Lease + 狀態機 + 樂觀鎖)    (S3 / DB 版本化隔離)
+
+雙11活動元件講解:閘門 / 限流元件（API Gateway / 限流）：這是最外層的硬邊界。除了做基礎的 Token 桶限流，我還在此處實作 MAX_INPUT_CHARS = 4000 物理截斷。這不只是為了控制 Token 帳單爆量，更是為了在最前端直接破壞攻擊者精心建構的冗長 Prompt Injection 惡意 Payload，不讓髒數據污染後端。
+
+緩衝 / 排隊元件（Queue / 租戶公平性）：當流量像海嘯般湧入時，系統不能硬碰硬。我將請求灌入緩衝佇列進行削峰填谷。這裡我不盲目下 ORDER BY priority，而是使用 Window Function 實作 30% 租戶配額公平性演算法，徹底解決多租戶環境下的『雜訊鄰居飢餓問題』，確保小客戶的任務絕不被大戶餓死。
+
+核心狀態 / 派工引擎（Lease + 狀態機 + 樂觀鎖）：當 Worker 來領取任務時，我的核心引擎不依賴 Worker 本地時鐘，一律由 Server 端定錨相對 TTL。在 Worker 進行長耗時 AI 推理、HTTP 斷線或突發當機時，由狀態機與 LeaseService 自動重置 Pending。在最關鍵的 Ack 階段，透過一條帶有狀態檢查的 UPDATE ... WHERE version_token = :expected_token SQL 語法，利用資料庫回傳的 rowcount == 0 特性，當場截斷並強制『殭屍 Worker』異常自毀，保證執行權的唯一性。
+
+外部副作用 / 儲存層（S3 / DB 版本化隔離）：如果殭屍 Worker 在被資料庫拒絕前，已經把 50MB 的 AI 報告寫入外部 S3，我也設計了 Fencing（柵欄機制）。檔案強制命名為 job_id_version_token.json 進行版本化隔離。只有最終在 DB 主表樂觀鎖 Ack 成功的那個 Worker，才有權力改寫主表的真理指針（Pointer）。其餘殭屍寫入的檔案，在系統眼裡永遠只是無意義的幽靈碎片。
+--------------------------------------------------------------------------------------------------------------------------
+
 
 #時鐘偏移問題有一招解法非常有用，但成本相對高昂 : Google Spanner TrueTime API
 答:拿出銣原子鐘和GPS接收器把全球節點的時鐘偏移硬生生壓在微秒（Microseconds）甚至奈秒級的極小誤差範圍內，這樣一來，我們在寫分散式系統時，資料庫的 NOW() 就不再有『誤差 7 秒』的不確定性，而是能得到一個精準的時間範圍區間 (開頭, 結尾)。只要兩個事件的時間區間沒有重疊，我們連分散式鎖都不用下，直接就能靠『絕對時間戳』判定誰先誰後，從物理層面徹底抹除時鐘偏移引發的 Race Condition
