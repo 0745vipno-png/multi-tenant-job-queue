@@ -88,6 +88,9 @@ This system guarantees strict data consistency against brain-split through an in
 執行後，我會去檢查資料庫回傳的 rowcount (受影響列數)。如果 rowcount == 1，代表鎖定與驗證成功，任務安全交付。
 如果 rowcount == 0，代表在我發起 Update 的前一秒，這個任務的狀態或 Token 已經被 LeaseService 判定超時並改寫了。這時系統會直接判定該次 Ack 失效，強制目前的 Worker 拋出異常並自我終止。透過這種 Atomic（原子性）的 SQL 條件更新，即使在 SQLite 下，我也100% 確保樂觀鎖的確定性。」
 
+資料安全隔離（Data Isolation）怎麼做？ 如果 A 租戶傳進來的 LLM 提示詞被系統存進資料庫，你要怎麼保證 B 租戶絕對查不到 A 的隱私？
+答:
+
 --------------------------------------------------------------------------------------------------------------------------
 
 進階難度問答題:
@@ -114,6 +117,12 @@ This system guarantees strict data consistency against brain-split through an in
 問:「在高併發下，每次 Polling 都用 Window Function 做 30% 的 Tenant 篩選，SQLite 的 CPU 可能會吃滿。未來如果要轉向 PostgreSQL，你會怎麼優化這個公平調度佇列？」
 答:：未來可以引入 Redis 的 ZSET（有序集合）為每個 Tenant 做權重滑動視窗，或者在應用層（Application Layer）實作變形的使用者權杖桶（Token Bucket），把這層計算從關聯式 DB 剝離。
 
+問: 提到可以用 Redis ZSET 來優化公平佇列，不讓 PostgreSQL 效能吃滿。那你要怎麼具體用 Redis 設計，才能同時滿足「Tenant 隔離」和「優先級（Priority）」？
+
+答:「在 Redis 中，我會為每個租戶（Tenant）建立獨立的 ZSET（例如 queue:tenant:{tenant_id}）。
+Score 的設計：ZSET 的 Score 欄位直接用 『AI 任務的 Priority + 進入時間戳』 組合成一個權重分數。高優先級的任務分數高，在 ZSET 裡會自動排在最前面。
+公平派發（Round-Robin）：我們後端的 Worker 在 Polling 時，不再去掃大資料庫，而是透過程式碼在應用層巡檢各租戶的 ZSET。每次從 Tenant A 取 5 個、Tenant B 取 5 個。
+無任務優化：如果某個租戶的 ZSET 空了，直接跳過，絕不卡住進程。這樣就把最耗性能的排序與篩選，用 \(O(\log N)\) 的超快速度在記憶體（Redis）中搞定，徹底解放關聯式資料庫的 CPU。」
 --------------底下為架構圖的設計-------------------------------
 
 # Multi-Tenant Job Queue / Task Runner
